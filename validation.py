@@ -1,29 +1,15 @@
 """Validation rules for individual observation windows.
 
-This module is where inheritance and method overriding are used. There is one
-base class, ValidationRule, and several subclasses that each override the
-check method with a different test.
-
-Inheritance earns its place here because every rule answers the same question
-in the same shape. Given one window, what is wrong with it? The base class
-fixes that shape and handles the shared parts, such as the rule name and the
-wording of the message. Each subclass only has to supply the test itself.
-
-A rule returns a list of problem descriptions. An empty list means the rule
-found nothing wrong. Returning a list rather than True or False lets a single
-window report several problems at once, which matters for the poor-quality
-data where a window can be both badly measured and missing a field.
+Each rule returns a list of problem strings. An empty list means the window
+passed that rule.
 """
 
 
-# A window measured while the sensor had poor contact is not trustworthy even
-# if the numbers themselves look plausible. The clean scenarios in the data
-# generator sit between 0.82 and 0.99, and the poor-quality scenario sits
-# between 0.05 and 0.55, so 0.60 separates them with room on both sides.
+# Clean scenarios sit between 0.82 and 0.99, poor-quality between 0.05 and
+# 0.55, so 0.60 separates them with margin on both sides.
 MINIMUM_SIGNAL_QUALITY = 0.60
 
-# Physiologically possible ranges. Anything outside these is a sensor fault
-# rather than an unusual person. The ranges follow DATA_DESCRIPTION.md.
+# Ranges follow DATA_DESCRIPTION.md.
 HEART_RATE_RANGE = (35, 205)
 TEMPERATURE_RANGE = (25.0, 42.0)
 ACTIVITY_LEVEL_RANGE = (0.0, 1.0)
@@ -32,13 +18,7 @@ SKIN_RESPONSE_MINIMUM = 0.0
 
 
 class ValidationRule:
-    """Base class for every validation rule.
-
-    Subclasses override check and return a list of strings describing what is
-    wrong with the window. This class is not meant to be used directly. Its
-    own check raises, so that a subclass which forgets to override it fails
-    loudly during development instead of quietly passing every window.
-    """
+    """Base class for validation rules. Subclasses override check."""
 
     def __init__(self, name):
         self.name = name
@@ -54,12 +34,7 @@ class ValidationRule:
 
 
 class MissingValueRule(ValidationRule):
-    """Reject windows where a required field is absent.
-
-    The generator sets heart_rate and skin_response to None in the
-    poor-quality scenario. A missing measurement cannot be estimated or filled
-    in, so the window is rejected rather than guessed at.
-    """
+    """Reject windows where a required field is absent or not numeric."""
 
     REQUIRED_FIELDS = (
         "heart_rate",
@@ -79,22 +54,13 @@ class MissingValueRule(ValidationRule):
             if value is None:
                 problems.append("{0} is missing".format(field))
             elif not isinstance(value, (int, float)) or isinstance(value, bool):
+                # bool is a subclass of int in Python, so exclude it explicitly.
                 problems.append("{0} is not a number".format(field))
         return problems
 
 
 class ImpossibleValueRule(ValidationRule):
-    """Reject windows holding values a real body cannot produce.
-
-    The generator injects a heart rate of 265 and an activity level of -0.20
-    in the poor-quality scenario. Both are outside what the sensor could
-    legitimately measure, so they indicate a fault in the device rather than
-    an unusual session.
-
-    Fields that are missing are skipped here. MissingValueRule has already
-    reported those, and reporting the same window twice for one underlying
-    fault would make the rejection counts harder to read.
-    """
+    """Reject windows holding values outside the physiological ranges."""
 
     def __init__(self):
         super().__init__("impossible value")
@@ -110,6 +76,7 @@ class ImpossibleValueRule(ValidationRule):
         )
 
         for field, value, bounds in checks:
+            # Missing fields are skipped, MissingValueRule already flagged them.
             if not isinstance(value, (int, float)) or isinstance(value, bool):
                 continue
             lower, upper = bounds
@@ -129,12 +96,7 @@ class ImpossibleValueRule(ValidationRule):
 
 
 class SignalQualityRule(ValidationRule):
-    """Flag windows the device itself reported low confidence in.
-
-    This rule is different from the other two. The numbers may look entirely
-    reasonable, but the device is telling us it was not measuring well. Using
-    such a window would let plausible-looking noise into the averages.
-    """
+    """Reject windows the device reported low confidence in."""
 
     def __init__(self, minimum=MINIMUM_SIGNAL_QUALITY):
         super().__init__("low signal quality")
@@ -154,12 +116,7 @@ class SignalQualityRule(ValidationRule):
 
 
 class OrderedTimestampRule(ValidationRule):
-    """Reject windows without a usable position in the session.
-
-    Recovery is detected by comparing the start of a session with its end, so
-    a window that cannot be placed in order is not safe to include even if its
-    measurements are fine.
-    """
+    """Reject windows without a usable position in the session."""
 
     def __init__(self):
         super().__init__("bad timestamp")
@@ -174,13 +131,7 @@ class OrderedTimestampRule(ValidationRule):
 
 
 class ObservationValidator:
-    """Runs a collection of rules over every window in a session.
-
-    The validator holds rules rather than inheriting from them, because it is
-    not itself a rule. It is composition again at a smaller scale. Adding a new
-    rule means writing one subclass and putting it in this list, without
-    touching the session, the analysis or the report.
-    """
+    """Runs a collection of rules over every window in a session."""
 
     def __init__(self, rules=None):
         if rules is None:
@@ -193,7 +144,6 @@ class ObservationValidator:
         self.rules = list(rules)
 
     def validate_observation(self, observation):
-        """Run every rule over one window and record the outcome on it."""
         problems = []
         for rule in self.rules:
             problems.extend(rule.check(observation))
@@ -201,11 +151,7 @@ class ObservationValidator:
         return problems
 
     def validate_session(self, session):
-        """Validate every window in a session.
-
-        Returns a dictionary summarising what happened, which later becomes
-        part of the structured analysis result.
-        """
+        """Validate every window and return a summary dictionary."""
         problem_counts = {}
         for observation in session.observations:
             problems = self.validate_observation(observation)
@@ -226,12 +172,7 @@ class ObservationValidator:
 
 
 def _problem_label(problem):
-    """Group similar problem messages so the report can count them.
-
-    The individual messages carry the offending value, which is useful when
-    reading one window but unhelpful when counting across a session. This
-    strips the message back to the field and the kind of fault.
-    """
+    """Strip the offending value from a message so problems can be counted."""
     if "is missing" in problem or "is not a number" in problem:
         return problem.split(" is ")[0] + " missing or unreadable"
     if "outside" in problem or "negative" in problem:

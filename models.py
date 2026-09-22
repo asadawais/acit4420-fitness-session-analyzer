@@ -1,30 +1,8 @@
-"""Domain classes for the Smart Fitness Session Analyzer.
-
-Three classes live here:
-
-Participant  holds a person and their personal reference measurements.
-Observation  holds one measurement window from the wearable device.
-Session      groups a Participant together with a list of Observations.
-
-Session demonstrates composition. A Session owns its Participant and its
-Observation objects, and those objects have no meaning outside the session
-they belong to.
-"""
+"""Domain classes: Participant, Observation and Session."""
 
 
 class Participant:
-    """A person taking part in a training session.
-
-    The baseline values are personal reference measurements. Two people can
-    produce very different raw numbers during the same exercise, so every
-    comparison in this program is made against the person's own baseline
-    rather than against a fixed number.
-
-    The baselines are stored in protected attributes and exposed through
-    read-only properties. Once a participant is created the reference values
-    must not be edited by accident, because every later calculation depends
-    on them.
-    """
+    """A person and their personal reference measurements."""
 
     def __init__(self, participant_id, baseline_heart_rate,
                  baseline_skin_response, baseline_temperature):
@@ -38,14 +16,7 @@ class Participant:
 
     @classmethod
     def from_profile(cls, profile):
-        """Build a Participant from the generator's profile dictionary.
-
-        This is a class method because it is an alternative constructor. The
-        data generator hands back a plain dictionary, and this keeps the
-        knowledge of that dictionary layout in one place instead of spreading
-        it across the program. If the generator ever changed its field names,
-        only this method would need updating.
-        """
+        """Build a Participant from the generator's profile dictionary."""
         if not isinstance(profile, dict):
             raise TypeError("profile must be a dictionary")
 
@@ -83,7 +54,6 @@ class Participant:
         return self._baseline_temperature
 
     def heart_rate_above_baseline(self, heart_rate):
-        """Return how far a measured heart rate sits above this person's rest."""
         return heart_rate - self._baseline_heart_rate
 
     def temperature_above_baseline(self, temperature):
@@ -93,24 +63,13 @@ class Participant:
         return skin_response - self._baseline_skin_response
 
     def __repr__(self):
-        return (
-            "Participant(id={0!r}, baseline_hr={1:.0f})".format(
-                self._participant_id, self._baseline_heart_rate
-            )
+        return "Participant(id={0!r}, baseline_hr={1:.0f})".format(
+            self._participant_id, self._baseline_heart_rate
         )
 
 
 class Observation:
-    """One measurement window produced by the wearable device.
-
-    An Observation stores the raw values exactly as they arrived, including
-    missing or impossible ones. It does not clean or correct anything. The
-    validation rules in validation.py decide whether a window is usable, and
-    the outcome is recorded on the object afterwards.
-
-    Keeping the raw values means the report can say how many windows were
-    rejected and why, instead of silently dropping them.
-    """
+    """One measurement window, stored exactly as it arrived."""
 
     def __init__(self, timestamp, heart_rate, skin_response, temperature,
                  activity_level, signal_quality):
@@ -121,7 +80,6 @@ class Observation:
         self.activity_level = activity_level
         self.signal_quality = signal_quality
 
-        # Filled in by the validator. Until then the window is untested.
         self._is_usable = None
         self._problems = []
 
@@ -129,10 +87,8 @@ class Observation:
     def from_dict(cls, raw):
         """Build an Observation from one generator dictionary.
 
-        Missing keys become None rather than raising, because a window with a
-        missing field is exactly the kind of bad data this program is supposed
-        to detect and report. Refusing to build the object would hide the
-        problem instead of counting it.
+        Missing keys become None instead of raising, so a faulty window can be
+        counted and reported rather than crashing the run.
         """
         if not isinstance(raw, dict):
             raise TypeError("observation must be a dictionary")
@@ -148,7 +104,6 @@ class Observation:
 
     @property
     def is_usable(self):
-        """True only after validation has run and the window passed."""
         return self._is_usable is True
 
     @property
@@ -157,19 +112,14 @@ class Observation:
 
     @property
     def problems(self):
-        """A copy of the problem list, so callers cannot edit the original."""
         return list(self._problems)
 
     def record_validation(self, problems):
-        """Store the outcome of validation on this window.
-
-        An empty problem list means the window is usable.
-        """
+        """Store the validation outcome. An empty list means the window passed."""
         self._problems = list(problems)
         self._is_usable = len(self._problems) == 0
 
     def as_dict(self):
-        """Return the window as a dictionary, including its validation state."""
         return {
             "timestamp": self.timestamp,
             "heart_rate": self.heart_rate,
@@ -191,17 +141,7 @@ class Observation:
 
 
 class Session:
-    """A complete training session for one participant.
-
-    This is the composition example. A Session is built from a Participant
-    object and a list of Observation objects. It does not store loose numbers
-    copied out of them, it holds the objects themselves and asks them for what
-    it needs.
-
-    The session keeps its observation list protected so that windows cannot be
-    added after validation has run, which would leave the counts in the report
-    disagreeing with the data.
-    """
+    """A training session, built from a Participant and its Observations."""
 
     def __init__(self, participant, observations, label="session"):
         if not isinstance(participant, Participant):
@@ -218,14 +158,13 @@ class Session:
 
     @classmethod
     def from_generator_output(cls, profile, raw_observations, label="session"):
-        """Build a full Session straight from the generator's two return values."""
         participant = Participant.from_profile(profile)
         observations = [Observation.from_dict(raw) for raw in raw_observations]
         return cls(participant, observations, label=label)
 
     @property
     def observations(self):
-        """A copy of the window list, so the session contents stay fixed."""
+        # Returns a copy so windows cannot be added after validation has run.
         return list(self._observations)
 
     @property
@@ -233,7 +172,6 @@ class Session:
         return len(self._observations)
 
     def usable_observations(self):
-        """Only the windows that passed validation, in their original order."""
         return [item for item in self._observations if item.is_usable]
 
     def rejected_observations(self):

@@ -1,25 +1,10 @@
-"""Scenario definitions for the analyzer.
-
-This module is the only place that talks to the instructor-supplied
-data_generator. Everything else in the program works with Session objects, so
-if the data source were swapped for a real device feed, only this file would
-change.
-
-data_generator.py is used exactly as supplied and is not modified.
-
-Two kinds of scenario are defined here. The five required ones come from the
-generator. A small number of hand-built edge cases are added on top, because
-the generator always returns at least six windows of roughly sensible shape
-and cannot produce an empty session or a session of a single window. Those
-cases still need to be handled without crashing.
-"""
+"""Scenario definitions. The only module that calls data_generator."""
 
 from data_generator import available_scenarios, generate_fitness_data
 from models import Observation, Participant, Session
 
 
-# Fixed seeds keep the console report reproducible between runs, which makes
-# the example output in the README trustworthy.
+# Fixed seeds keep the console output reproducible between runs.
 GENERATOR_SCENARIOS = (
     ("Resting session", "resting", 42),
     ("Moderate activity", "moderate_activity", 42),
@@ -34,7 +19,7 @@ DEFAULT_WINDOW_COUNT = 12
 def build_session_from_generator(label, scenario, seed=42,
                                  number_of_windows=DEFAULT_WINDOW_COUNT,
                                  participant_id="P001"):
-    """Call the generator once and wrap the result in a Session object."""
+    """Call the generator once and wrap the result in a Session."""
     profile, raw_observations = generate_fitness_data(
         participant_id=participant_id,
         scenario=scenario,
@@ -45,7 +30,7 @@ def build_session_from_generator(label, scenario, seed=42,
 
 
 def build_required_sessions():
-    """Return the five scenarios the assignment asks for."""
+    """The five scenarios the assignment asks for."""
     return [
         build_session_from_generator(label, scenario, seed)
         for label, scenario, seed in GENERATOR_SCENARIOS
@@ -53,11 +38,8 @@ def build_required_sessions():
 
 
 def build_edge_case_sessions():
-    """Return small hand-built sessions the generator cannot produce.
-
-    These exist to show that the program degrades sensibly rather than
-    crashing when it is handed something unexpected.
-    """
+    """Small sessions the generator cannot produce, since it always returns
+    at least six reasonably shaped windows."""
     participant = Participant(
         participant_id="P999",
         baseline_heart_rate=70,
@@ -82,7 +64,7 @@ def build_edge_case_sessions():
         label="Single usable window",
     )
 
-    # Every field broken in a different way, to exercise all rules at once.
+    # One window per rule, so all four fire at least once.
     all_broken = Session(
         participant,
         [
@@ -103,5 +85,4 @@ def build_all_sessions():
 
 
 def generator_scenario_names():
-    """Expose the generator's own scenario names for reference."""
     return available_scenarios()
