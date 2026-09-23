@@ -1,6 +1,6 @@
 """Scenario definitions. The only module that calls data_generator."""
 
-from data_generator import available_scenarios, generate_fitness_data
+from data_generator import generate_fitness_data
 from models import Observation, Participant, Session
 
 
@@ -71,18 +71,32 @@ def build_edge_case_sessions():
             Observation(0, None, 2.1, 32.9, 0.50, 0.91),
             Observation(1, 265, 2.2, 33.0, 0.55, 0.90),
             Observation(2, 120, -1.0, 33.1, -0.20, 0.88),
-            Observation(3, 118, 2.3, 55.0, 0.52, 0.12),
+            Observation(-1, 118, 2.3, 33.2, 0.52, 0.12),
         ],
         label="Every window faulty",
     )
 
-    return [empty_session, single_window, all_broken]
+    # Enough usable windows to summarise, but under half of them survive, so
+    # this reaches the ratio branch of the insufficient-data check.
+    mostly_faulty = Session(
+        participant,
+        [
+            Observation(0, 104, 2.1, 33.0, 0.52, 0.93),
+            Observation(1, 106, 2.2, 33.1, 0.54, 0.92),
+            Observation(2, 108, 2.2, 33.0, 0.55, 0.91),
+            Observation(3, 105, 2.1, 33.1, 0.53, 0.90),
+            Observation(4, None, 2.2, 33.0, 0.54, 0.91),
+            Observation(5, 265, 2.1, 33.1, 0.52, 0.92),
+            Observation(6, 107, None, 33.0, 0.55, 0.90),
+            Observation(7, 106, 2.2, 33.1, -0.30, 0.91),
+            Observation(8, 105, 2.1, 33.0, 0.53, 0.20),
+        ],
+        label="Under half the windows usable",
+    )
+
+    return [empty_session, single_window, all_broken, mostly_faulty]
 
 
 def build_all_sessions():
     """Every scenario the program demonstrates, in report order."""
     return build_required_sessions() + build_edge_case_sessions()
-
-
-def generator_scenario_names():
-    return available_scenarios()

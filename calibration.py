@@ -17,7 +17,7 @@ WINDOW_COUNT = 12
 
 
 def _numeric(values):
-    """Keep only usable numbers, dropping None and impossible negatives."""
+    """Keep only the numeric values, dropping None and non-numbers."""
     return [
         value for value in values
         if isinstance(value, (int, float)) and not isinstance(value, bool)

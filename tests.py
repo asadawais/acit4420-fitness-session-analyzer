@@ -58,6 +58,16 @@ class TestParticipant(unittest.TestCase):
         with self.assertRaises(KeyError):
             Participant.from_profile({"participant_id": "P001"})
 
+    def test_from_profile_rejects_non_numeric_baseline(self):
+        profile = {
+            "participant_id": "P001",
+            "baseline_heart_rate": "n/a",
+            "baseline_skin_response": 1.5,
+            "baseline_temperature": 32.0,
+        }
+        with self.assertRaises(ValueError):
+            Participant.from_profile(profile)
+
     def test_baseline_is_read_only(self):
         participant = make_participant()
         with self.assertRaises(AttributeError):
@@ -140,6 +150,16 @@ class TestValidationRules(unittest.TestCase):
 
     def test_good_signal_quality_passes(self):
         self.assertEqual(SignalQualityRule().check(make_observation()), [])
+
+    def test_nan_is_rejected(self):
+        problems = MissingValueRule().check(
+            make_observation(heart_rate=float("nan")))
+        self.assertEqual(len(problems), 1)
+
+    def test_nan_does_not_slip_past_the_range_check(self):
+        observation = make_observation(heart_rate=float("nan"))
+        self.assertEqual(ImpossibleValueRule().check(observation), [])
+        self.assertEqual(len(MissingValueRule().check(observation)), 1)
 
     def test_negative_timestamp_is_caught(self):
         problems = OrderedTimestampRule().check(make_observation(timestamp=-1))
@@ -237,6 +257,29 @@ class TestClassification(unittest.TestCase):
             for seed in range(1, 21):
                 got = self.classify(scenario, seed=seed)
                 self.assertEqual(got, want, "{0} seed {1}".format(scenario, seed))
+
+    def test_low_usable_ratio_is_insufficient(self):
+        sessions = {s.label: s for s in build_all_sessions()}
+        session = sessions["Under half the windows usable"]
+        result = SessionAnalyzer().analyze(session)
+        self.assertEqual(result["classification"], analysis.INSUFFICIENT)
+        self.assertIn("survived validation", result["reasons"][0])
+
+    def test_every_validation_rule_fires_somewhere_in_the_scenarios(self):
+        rules = [
+            MissingValueRule(),
+            ImpossibleValueRule(),
+            SignalQualityRule(),
+            OrderedTimestampRule(),
+        ]
+        fired = {rule.name: False for rule in rules}
+        for session in build_all_sessions():
+            for observation in session.observations:
+                for rule in rules:
+                    if rule.check(observation):
+                        fired[rule.name] = True
+        for name, did_fire in fired.items():
+            self.assertTrue(did_fire, name + " never fires in the scenarios")
 
     def test_single_window_is_insufficient(self):
         session = Session(make_participant(), [make_observation()], label="one")
