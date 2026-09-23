@@ -19,9 +19,10 @@ Standard library only, no installs.
 ## Running it
 
 ```
-cd acit4420-fitness-analyzer-S374979
 python3 main.py
 ```
+
+Run it from the project folder, the one holding `main.py`.
 
 If `python3` does not work on your machine, use `python main.py`.
 
@@ -34,7 +35,7 @@ python3 calibration.py
 ```
 
 `--detailed` adds a list of every rejected window and what was wrong with it.
-`tests.py` runs 47 unit tests. `calibration.py` prints the measurements I used
+`tests.py` runs 52 unit tests. `calibration.py` prints the measurements I used
 to pick the thresholds, more on that below.
 
 `requirements.txt` has no packages in it because there are no dependencies.
@@ -82,8 +83,9 @@ having to take my word for them.
 
 `Session` is the main one. You build it from a `Participant` object and a list
 of `Observation` objects, and it keeps those objects instead of copying numbers
-out of them. When it needs a baseline it asks the participant. When it needs to
-know if a window is usable it asks the window.
+out of them. `SessionAnalyzer` then goes through the session to reach them, so
+when it needs a baseline it asks the participant and when it needs to know if a
+window is usable it asks the window. Nothing copies those values around.
 
 `ObservationValidator` holds a list of rule objects rather than inheriting from
 them, because a validator is not itself a rule. That way adding a new rule means
@@ -277,6 +279,7 @@ Poor-quality sensor data        insufficient data           0/12
 Empty session                   insufficient data            0/0
 Single usable window            insufficient data            1/1
 Every window faulty             insufficient data            0/4
+Under half the windows usable   insufficient data            4/9
 ```
 
 And with `--detailed`, the poor quality session gets this:
@@ -294,7 +297,7 @@ Rejected windows
 
 ## Scenarios
 
-The five required ones from the generator, plus three I built by hand in
+The five required ones from the generator, plus four I built by hand in
 `sample_data.py`:
 
 | Scenario | Where from | Result |
@@ -307,10 +310,17 @@ The five required ones from the generator, plus three I built by hand in
 | Empty session | hand-built | insufficient data, no crash |
 | Single usable window | hand-built | insufficient data |
 | Every window faulty | hand-built | insufficient data, all four rules fire |
+| Under half the windows usable | hand-built | insufficient data, 4 of 9 survive |
 
 The generator always gives at least six reasonably shaped windows, so it cannot
 produce an empty session or a one window session. Those still need to not crash
 the program, which is why I made them myself.
+
+The last one exists because there are two ways to end up with insufficient data.
+Too few usable windows is one, and enough windows but under half of them
+surviving is the other. The generator never produces the second, so I built a
+session where 4 of 9 survive to make sure that path works and says something
+sensible.
 
 ## Limitations
 
@@ -324,6 +334,9 @@ the program, which is why I made them myself.
   swings could in theory look like a decline. It never happens with this data
   because the low signal quality strips those windows out first, but I am not
   guarding against it beyond that.
+- Validation checks the values, not whether they are consistent with each
+  other. A window with a resting heart rate and a very high activity level is
+  physically odd but passes, because each field is fine on its own.
 - No way to tell a sensor fault from someone taking the device off mid session.
   Both just show up as rejected windows.
 - This is thresholds, not a model. It tells you which band a session falls in
