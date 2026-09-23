@@ -343,3 +343,15 @@ sensible.
   and gives no confidence number.
 - Only the five scenarios are recognised. Anything outside them gets forced into
   the closest band.
+
+## Declarations
+
+`data_generator.py` came with the assignment and I have not changed it.
+
+I used Claude (Anthropic) as a supporting tool during parts of the project. It
+was used to help clarify programming concepts, improve code structure and
+documentation, assist with identifying appropriate classification thresholds
+and improve the wording and organisation of the README. The implementation,
+testing, interpretation of results and final design decisions were carried out
+by me. I reviewed, tested and critically assessed all AI-assisted suggestions
+before including them in the final work.
