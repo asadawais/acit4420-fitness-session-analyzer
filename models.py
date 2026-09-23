@@ -30,6 +30,13 @@ class Participant:
         if missing:
             raise KeyError("profile is missing fields: " + ", ".join(missing))
 
+        for field in required[1:]:
+            value = profile[field]
+            if not isinstance(value, (int, float)) or isinstance(value, bool):
+                raise ValueError(
+                    "{0} must be a number, got {1!r}".format(field, value)
+                )
+
         return cls(
             profile["participant_id"],
             profile["baseline_heart_rate"],
@@ -118,18 +125,6 @@ class Observation:
         """Store the validation outcome. An empty list means the window passed."""
         self._problems = list(problems)
         self._is_usable = len(self._problems) == 0
-
-    def as_dict(self):
-        return {
-            "timestamp": self.timestamp,
-            "heart_rate": self.heart_rate,
-            "skin_response": self.skin_response,
-            "temperature": self.temperature,
-            "activity_level": self.activity_level,
-            "signal_quality": self.signal_quality,
-            "usable": self.is_usable,
-            "problems": self.problems,
-        }
 
     def __repr__(self):
         state = "unchecked"

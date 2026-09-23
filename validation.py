@@ -4,6 +4,8 @@ Each rule returns a list of problem strings. An empty list means the window
 passed that rule.
 """
 
+import math
+
 
 # Clean scenarios sit between 0.82 and 0.99, poor-quality between 0.05 and
 # 0.55, so 0.60 separates them with margin on both sides.
@@ -25,9 +27,6 @@ class ValidationRule:
 
     def check(self, observation):
         raise NotImplementedError("each rule must implement check")
-
-    def describe(self):
-        return self.name
 
     def __repr__(self):
         return "{0}(name={1!r})".format(type(self).__name__, self.name)
@@ -55,6 +54,10 @@ class MissingValueRule(ValidationRule):
                 problems.append("{0} is missing".format(field))
             elif not isinstance(value, (int, float)) or isinstance(value, bool):
                 # bool is a subclass of int in Python, so exclude it explicitly.
+                problems.append("{0} is not a number".format(field))
+            elif isinstance(value, float) and math.isnan(value):
+                # NaN compares false against everything, so the range check
+                # below would let it through. It has to be caught here.
                 problems.append("{0} is not a number".format(field))
         return problems
 
